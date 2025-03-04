@@ -354,6 +354,8 @@ class JulierSigmaPoints(object):
             # pylint: disable=bad-whitespace
             sigmas[k+1]   = self.subtract(x, -U[k])
             sigmas[n+k+1] = self.subtract(x, U[k])
+
+
         return sigmas
 
 
