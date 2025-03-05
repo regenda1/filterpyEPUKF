@@ -368,7 +368,6 @@ class UnscentedKalmanFilter(object):
 
     def predict(self, dt=None, UT=None, fx=None, **fx_args):
 
-        # print(".................predict zaciatok..............")
         if dt is None:
             dt = self._dt
 
@@ -376,33 +375,22 @@ class UnscentedKalmanFilter(object):
             UT = unscented_transform
 
         # calculate sigma points for given mean and covariance and pass them trough f(x)
-        # print("predict: 1. x: ", self.x)
         self.compute_process_sigmas(dt, fx, **fx_args)
 
         # and pass sigmas through the unscented transform to compute prior
-        # print("sigmas_f: ", self.sigmas_f)
-        self.x, self.P = UT(self.sigmas_f, self.Wm, self.Wc, self.Q,
-                            # kika ono sa to x predikuje nie na zaklade svojho stavu, tak ja neviem, ze akuy ma vplyv toto UT a potom znovu pregenrovanie sp
-                            self.x_mean, self.residual_x)
-
-        # print("predicted x: ", self.x)
-        # print("predicted P: ", self.P)
-        # print("predict: 2. x: ", self.x)
+        self.x, self.P = UT(self.sigmas_f, self.Wm, self.Wc, self.Q, self.x_mean, self.residual_x)
 
         # update sigma points to reflect the new variance of the points
         self.sigmas_f = self.points_fn.sigma_points()
-        # print("predict: 3. x: ", self.x)
 
         # save prior
         self.x_prior = np.copy(self.x)
         self.P_prior = np.copy(self.P)
 
-        # print(".................predict koniec..............")
 
-    # kika toto je moje update, ktore prerabam na ep ukf
+    # update function modified by article
     def update(self, z, R=None, UT=None, hx=None, **hx_args):
 
-        # print(".....................update zaciatok.......................")
         if z is None:
             self.z = np.array([[None] * self._dim_z]).T
             self.x_post = self.x.copy()
@@ -427,55 +415,18 @@ class UnscentedKalmanFilter(object):
 
         self.sigmas_h = np.atleast_2d(sigmas_h)
 
-        # kika zaciatok
-        # print("kika/UKF sigmasF shape: ", self.sigmas_f.shape)
         Y = np.multiply(self.sigmas_h[:, 0], self.sigmas_h[:, 1])
-        # print("Y shape: ", Y.shape)
-        # print("self.Wm: ", self.Wm.shape)
         meanY = np.sum(self.Wm * Y)
         meanX = np.sum(self.Wm * self.sigmas_f[:, 0])
-        # print("meanY shape: ", meanY.shape)
-        # print("meanY: ", meanY)
 
-        # Py = self.myWeightedCovariance(Y,Y,meanY,meanY)
-        # Pxy = self.myWeightedCovariance(self.sigmas_f[:,0], Y, meanX, meanY)
-        # YminusMeanY = Y - meanY
-        # XsMinusMeanXs = self.sigmas_f[:,0] - np.mean(self.sigmas_f[:,0])
         Py = np.sum(np.multiply(Y - meanY, Y - meanY) * self.Wc)
         Pxy = np.sum(np.multiply(self.sigmas_f[:, 0] - meanX, Y - meanY) * self.Wc)
-        # Py = np.cov(YminusMeanY, YminusMeanY)
-        # Pxy = np.cov(XsMinusMeanXs, YminusMeanY)
-        # print("covY shape: ", Py.shape)
-        # print("covXY shape: ", Pxy.shape)
-        # print("kika/UKF Y shape: ", Y.shape)
-        # kika koniec
 
-        # pass prior sigmas through h(x) to get measurement sigmas
-        # the shape of sigmas_h will vary if the shape of z varies, so
-        # recreate each time
-
-        # mean and covariance of prediction passed through unscented transform
-        # zp, self.S = UT(self.sigmas_h, self.Wm, self.Wc, R, self.z_mean, self.residual_z)
-        # self.SI = self.inv(self.S)
-
-        # compute cross variance of the state and the measurements
-        # Pxz = self.cross_variance(self.x, zp, self.sigmas_f, self.sigmas_h)
-
-        # self.K = dot(Pxz, self.SI)        # Kalman gain #kika toto je dobry kalman gain
-        # print("Py: ", Py)
-        self.K = Pxy * (1.0 / Py)  # kika moj kalman gain
+        self.K = Pxy * (1.0 / Py)
         # self.y = self.residual_z(z, zp)   # residual
 
-        # update Gaussian state estimate (x, P)
-        # self.x = self.x + dot(self.K, self.y) #kika toto je dobry update x
-        # self.P = self.P - dot(self.K, dot(self.S, self.K.T))
-        # print("update: x: ", self.x)
-        # print("update: K: ", self.K)
-        # print("update: z: ", z)
-        # print("update: meanY: ", meanY)
+        # update state estimate (x, P)
         self.x = self.x + self.K * (z - meanY)
-        # print("x po: ", self.x)
-        # self.P = self.P - self.K*self.S*self.K toto tu netreba
 
         # save measurement and posterior state
         self.z = deepcopy(z)
@@ -488,85 +439,6 @@ class UnscentedKalmanFilter(object):
         self._mahalanobis = None
         # print(".....................update koniec.......................")
 
-    """ kika toto je dobry update, co ma byt v ukf
-    def update(self, z, R=None, UT=None, hx=None, **hx_args):
-
-        Update the UKF with the given measurements. On return,
-        self.x and self.P contain the new mean and covariance of the filter.
-
-        Parameters
-        ----------
-
-        z : numpy.array of shape (dim_z)
-            measurement vector
-
-        R : numpy.array((dim_z, dim_z)), optional
-            Measurement noise. If provided, overrides self.R for
-            this function call.
-
-        UT : function(sigmas, Wm, Wc, noise_cov), optional
-            Optional function to compute the unscented transform for the sigma
-            points passed through hx. Typically the default function will
-            work - you can use x_mean_fn and z_mean_fn to alter the behavior
-            of the unscented transform.
-
-        **hx_args : keyword argument
-            arguments to be passed into h(x) after x -> h(x, **hx_args)
-
-            kika tu konci komentar
-
-
-        if z is None:
-            self.z = np.array([[None]*self._dim_z]).T
-            self.x_post = self.x.copy()
-            self.P_post = self.P.copy()
-            return
-
-        if hx is None:
-            hx = self.hx
-
-        if UT is None:
-            UT = unscented_transform
-
-        if R is None:
-            R = self.R
-        elif isscalar(R):
-            R = eye(self._dim_z) * R
-
-        # pass prior sigmas through h(x) to get measurement sigmas
-        # the shape of sigmas_h will vary if the shape of z varies, so
-        # recreate each time
-        sigmas_h = []
-        for s in self.sigmas_f:
-            sigmas_h.append(hx(s, **hx_args))
-
-        self.sigmas_h = np.atleast_2d(sigmas_h)
-
-        # mean and covariance of prediction passed through unscented transform
-        zp, self.S = UT(self.sigmas_h, self.Wm, self.Wc, R, self.z_mean, self.residual_z)
-        self.SI = self.inv(self.S)
-
-        # compute cross variance of the state and the measurements
-        Pxz = self.cross_variance(self.x, zp, self.sigmas_f, self.sigmas_h)
-
-
-        self.K = dot(Pxz, self.SI)        # Kalman gain
-        self.y = self.residual_z(z, zp)   # residual
-
-        # update Gaussian state estimate (x, P)
-        self.x = self.x + dot(self.K, self.y)
-        self.P = self.P - dot(self.K, dot(self.S, self.K.T))
-
-        # save measurement and posterior state
-        self.z = deepcopy(z)
-        self.x_post = self.x.copy()
-        self.P_post = self.P.copy()
-
-        # set to None to force recompute
-        self._log_likelihood = None
-        self._likelihood = None
-        self._mahalanobis = None
-        """
 
     def cross_variance(self, x, z, sigmas_f, sigmas_h):
         """
