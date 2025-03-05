@@ -75,6 +75,7 @@ class EdgePreservingSigmaPoints(object):
 
         self.n = n
         self.kappa = kappa
+        self.lambdaConst = np.pow(alpha,2)*(n+self.kappa)-n
         if sqrt_method is None:
             self.sqrt = cholesky
         else:
@@ -157,10 +158,10 @@ class EdgePreservingSigmaPoints(object):
         n = np.size(x)
 
         # set sigma points using formulas from article
-        sigmas = np.zeros((2*n+1, n))
-        U = np.full(P.shape, 0.001)
+        sigmas = np.empty((2*n+1, n))
+        U = np.empty(P.shape)
         try:
-            U = self.sqrt((n + self.kappa) * P)
+            U = self.sqrt((n + self.lambdaConst) * P)
         except:
             print("P v catch: ", P)
             print("SP: neigbours: ", self.filteredNeigbours)
@@ -168,8 +169,8 @@ class EdgePreservingSigmaPoints(object):
         sigmas[0] = x
         for k in range(n):
             # pylint: disable=bad-whitespace
-            sigmas[k+1]   = self.subtract(x, -U[k])
-            sigmas[n+k+1] = self.subtract(x, U[k])
+            sigmas[k+1]   = self.subtract(x, -U[:,k])
+            sigmas[n+k+1] = self.subtract(x, U[:,k])
 
         return sigmas
 
@@ -180,11 +181,12 @@ class EdgePreservingSigmaPoints(object):
         """
 
         n = self.n
-        k = self.kappa
+        l = self.lambdaConst
 
-        self.Wm = np.full(2*n+1, .5 / (n + k))
-        self.Wm[0] = k / (n+k)
+        self.Wm = np.full(2*n+1, .5 / (n + l))
+        self.Wm[0] = l / (n+l)
         self.Wc = self.Wm
+        self.Wc[0] = self.Wm[0]+(1-np.pow(alpha,2)+beta)
 
 
     def __repr__(self):

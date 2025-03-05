@@ -349,23 +349,6 @@ class UnscentedKalmanFilter(object):
         self.x_post = self.x.copy()
         self.P_post = self.P.copy()
 
-    # kika toto je moja funkcia
-    def myWeightedCovariance(self, v, u, meanV, meanU):
-        C = np.zeros((2, 2))
-        v -= meanV
-        u -= meanU
-
-        uu = np.multiply(u, u) * self.Wc
-        vv = np.multiply(v, v) * self.Wc
-        uv = np.multiply(u, v) * self.Wc
-
-        C[0, 0] = np.sum(uu)
-        C[0, 1] = np.sum(uv)
-        C[1, 0] = np.sum(uv)
-        C[1, 1] = np.sum(vv)
-
-        return C
-
     def predict(self, dt=None, UT=None, fx=None, **fx_args):
 
         if dt is None:
