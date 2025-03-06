@@ -13,12 +13,12 @@ imgW = 2500
 tireObj.setBlockSize(imgW,imgH)
 image = tireObj.nextTireBlock()
 
-#image = image[920:1400, 840:1280] #inside part of letter E
-image = image[1050:1300, 150:410] #stripes
+image = image[920:1400, 840:1280] #inside part of letter E
+#image = image[1050:1300, 150:410] #stripes
 #image = image[920:1020, 840:940] #piece of letter E
 
 #save original image
-cv2.imwrite(r"C:\Users\24000079\Documents\Kika\Obrazky\filtering\edgePresUkf\StripesOriginal.tif", image)
+cv2.imwrite(r"C:\Users\24000079\Documents\Kika\Obrazky\filtering\edgePresUkf\LetterERVSOriginal.tif", image)
 
 #print some info about image
 print("image shape: ", image.shape)
@@ -38,8 +38,9 @@ class EdgePreservingUnscentedKalmanFilter:
 
         self.filteredNeighbors = np.empty(4) #takes NHSP neigbors
 
+        #TODO: think about all constants and set them properly
         #init const
-        self.stdSize = 90 #value from experiments
+        self.stdSize = 1 #value from experiments
 
         #init consts from article
         self.n = 2
@@ -81,7 +82,7 @@ class EdgePreservingUnscentedKalmanFilter:
         filteredNeigborsStd = np.std(self.filteredNeigbors)
 
         #generate samples from Cauchy distribution
-        cauchySamples = cauchy.rvs(loc=filteredNeigborsMean, scale=filteredNeigborsStd, size=self.L)
+        cauchySamples = cauchy.rvs(loc=filteredNeigborsMean, scale=self.stdSize*filteredNeigborsStd, size=self.L)
         # start = filteredNeigborsMean-self.stdSize*filteredNeigborsStd
         # end = filteredNeigborsMean+self.stdSize*filteredNeigborsStd
         # cauchySamples = np.linspace(start,end,self.L)
@@ -181,4 +182,4 @@ print("filtered_image max: ", np.max(filtered_image))
 print("filtered_image min: ", np.min(filtered_image))
 
 #save filtered image
-cv2.imwrite(r"C:\Users\24000079\Documents\Kika\Obrazky\filtering\edgePresUkf\StripesFitlered.tif", filtered_image)
+cv2.imwrite(r"C:\Users\24000079\Documents\Kika\Obrazky\filtering\edgePresUkf\LetterERVSFitlered.tif", filtered_image)
