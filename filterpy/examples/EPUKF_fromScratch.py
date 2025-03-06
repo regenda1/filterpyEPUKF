@@ -13,11 +13,12 @@ imgW = 2500
 tireObj.setBlockSize(imgW,imgH)
 image = tireObj.nextTireBlock()
 
-image = image[920:1400, 840:1280] #inside part of letter E
+#image = image[920:1400, 840:1280] #inside part of letter E
+image = image[1050:1300, 150:410] #stripes
 #image = image[920:1020, 840:940] #piece of letter E
 
 #save original image
-cv2.imwrite(r"C:\Users\24000079\Documents\Kika\Obrazky\filtering\edgePresUkf\NewLetterEOriginal.tif", image)
+cv2.imwrite(r"C:\Users\24000079\Documents\Kika\Obrazky\filtering\edgePresUkf\StripesOriginal.tif", image)
 
 #print some info about image
 print("image shape: ", image.shape)
@@ -44,7 +45,7 @@ class EdgePreservingUnscentedKalmanFilter:
         self.n = 2
 
         self.zeta = 0.01 #value from article
-        self.gamma = 20.9 #value from experiments
+        self.gamma = 2.9 #value from experiments
         self.L = 100#number of samples for pdfs. Value from article
 
         alpha = 1.0
@@ -67,9 +68,9 @@ class EdgePreservingUnscentedKalmanFilter:
         mi = np.mean(self.filteredNeigbors)
         sumCoef = 1.0/(2.0*self.zeta*np.power(mi, 1.5))
 
-        ni = sumCoef*sum
+        niSquared = sumCoef*sum
 
-        xForLog = 1.0+(ni/self.gamma)
+        xForLog = 1.0+(niSquared/self.gamma)
         xForExp = -self.gamma*np.log(xForLog)
         qx = np.exp(xForExp)
         return qx
@@ -80,13 +81,13 @@ class EdgePreservingUnscentedKalmanFilter:
         filteredNeigborsStd = np.std(self.filteredNeigbors)
 
         #generate samples from Cauchy distribution
-        #cauchySamples = cauchy.rvs(loc=filteredSamplesMean, scale=np.abs(filteredSamplesStd), size=L)
-        start = filteredNeigborsMean-self.stdSize*filteredNeigborsStd
-        end = filteredNeigborsMean+self.stdSize*filteredNeigborsStd
-        cauchySamples = np.linspace(start,end,self.L)
+        cauchySamples = cauchy.rvs(loc=filteredNeigborsMean, scale=filteredNeigborsStd, size=self.L)
+        # start = filteredNeigborsMean-self.stdSize*filteredNeigborsStd
+        # end = filteredNeigborsMean+self.stdSize*filteredNeigborsStd
+        # cauchySamples = np.linspace(start,end,self.L)
 
         #evaluate samples by Cauchy pdf
-        q = cauchy.pdf(cauchySamples, loc=filteredNeigborsMean, scale=np.abs(filteredNeigborsStd))
+        q = cauchy.pdf(cauchySamples, loc=filteredNeigborsMean, scale=filteredNeigborsStd)
 
         #evaluate samples by "article" pdf
         p = []
@@ -118,7 +119,7 @@ class EdgePreservingUnscentedKalmanFilter:
             U = cholesky((self.n + self.lambdaConst) * P)
         except:
             print("P v catch: ", P)
-            print("SP: neigbours: ", self.filteredNeigbours)
+            print("SP: neigbours: ", self.filteredNeigbors)
 
         sigmas = np.empty((self.n, 2 * self.n + 1))
         sigmas[:, 0] = x
@@ -129,7 +130,7 @@ class EdgePreservingUnscentedKalmanFilter:
 
         return sigmas
 
-    def predict(self, z):
+    def predictAndUpdate(self, z):
         sigmas = self.sigma_points()
         Xx = sigmas[0]
         Xv = sigmas[1]
@@ -169,7 +170,7 @@ for i in range(1, image.shape[0]-1):
         epukf.setNeigbours(neighsbours)
 
         #set filtered pixel to image
-        filtered_image[i, j] = epukf.predict(z)[0]
+        filtered_image[i, j] = epukf.predictAndUpdate(z)[0]
 
 
 #return image to original values
@@ -180,4 +181,4 @@ print("filtered_image max: ", np.max(filtered_image))
 print("filtered_image min: ", np.min(filtered_image))
 
 #save filtered image
-cv2.imwrite(r"C:\Users\24000079\Documents\Kika\Obrazky\filtering\edgePresUkf\NewLetterEFilteredCauchy90Gamma50.tif", filtered_image)
+cv2.imwrite(r"C:\Users\24000079\Documents\Kika\Obrazky\filtering\edgePresUkf\StripesFitlered.tif", filtered_image)
